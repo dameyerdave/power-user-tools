@@ -1,0 +1,3 @@
+#!/bin/bash
+
+find . -type f ! -path './node_modules/*' -a ! -path './.*/*' -a ! -path './temp/*' -a ! -path './**/__pycache__/*' -a ! -path './ios/Pods/*' -exec grep -l "$1" {} \;

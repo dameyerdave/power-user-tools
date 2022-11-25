@@ -1,0 +1,21 @@
+#!/bin/bash
+
+numeric='^[0-9]+$'
+
+if git rev-parse --is-inside-work-tree > /dev/null 2>&1; then
+  repo_url=$(git remote -v | cut -d':' -f2 | cut -d'.' -f1)
+  user=${repo_url%%/*}
+  repo=${repo_url#*/}
+  while read comment
+  do
+    id=$(echo $comment | cut -d 'π' -f 1)
+    msg=$(echo $comment | cut -d 'π' -f 2)
+    url=$(echo $comment | cut -d 'π' -f 3)
+    if [[ $id =~ $numeric ]]; then
+      printf "\n---\n%s %s\n" "${id}" "${url}"
+      printf "%s\n" "${msg}"
+    else
+      printf "%s\n" "${id}"
+    fi
+  done < <(gh api /repos/${user}/${repo}/comments | jq -r '.[] |"\(.id)π\(.body)π\(.html_url)"')
+fi

@@ -1,0 +1,10 @@
+#!/bin/bash
+
+while read line
+do
+    if echo $line | grep 'time='; then
+        echo $line
+    else
+        printf "\a"
+    fi
+done < <(ping $1)

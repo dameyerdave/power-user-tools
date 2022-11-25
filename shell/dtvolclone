@@ -1,0 +1,42 @@
+#!/bin/bash
+
+function usage {
+  echo "USAGE: $(basename $0) from_volume to_volume"
+  exit 1
+}
+
+if [ $# -lt 2 ]; then
+  usage
+fi
+
+# replace / with _ in image
+FROM_VOL="$1"
+TO_VOL="$2"
+
+function vol_exists {
+  docker volume ls -f name=${1} | grep ${1} 2>&1 >/dev/null
+}
+
+function confirm {
+    # call with a prompt string or use a default
+    read -r -p "${1:-Are you sure? [y/N]} " response
+    case "$response" in
+        [yY][eE][sS]|[yY]) 
+            true
+            ;;
+        *)
+            false
+            ;;
+    esac
+}
+
+if ! vol_exists ${TO_VOL}; then
+  echo docker volume create --name ${TO_VOL}
+fi
+if vol_exists ${FROM_VOL}; then
+  echo docker run --rm -it -v ${FROM_VOL}:/from -v ${TO_VOL}:/to alpine ash -c "cd /from ; cp -av . /to"
+  confirm "Do you want to delete the old volume? [y/N]" && echo docker volume rm ${FROM_VOL}
+else
+  echo "${FROM_VOL} does not exist!"
+fi
+

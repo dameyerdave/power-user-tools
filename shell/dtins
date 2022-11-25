@@ -1,0 +1,19 @@
+#!/bin/bash
+
+function usage {
+    echo "USAGE dtrestart [pattern]"
+    exit 1
+}
+
+PAT="$1"
+
+while read container
+do
+    while read line
+    do
+      _status=$(echo $line | cut -d'#' -f 1)
+      _restart=$(echo $line | cut -d'#' -f 2)
+      printf "%-50s: %-20s %s\n" "${container}" "${_status}" "${_restart}"
+    done < <(docker inspect -f "{{ .State.Status }}#{{ .HostConfig.RestartPolicy.Name }}" $container)
+done < <(docker ps -a --format "{{.Names}}" | grep "$PAT")
+

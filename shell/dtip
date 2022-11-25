@@ -1,0 +1,16 @@
+#!/bin/bash
+
+DC=$(docker ps -a --format "{{.Names}}" | grep "$1" | head -1)
+
+printf "=== $DC ===\n"
+printf "Docker internal IPs:\n"
+IP=$(docker inspect -f "{{ .NetworkSettings.IPAddress }}" $DC | sed -E 's,^[ ]*,,')
+if [ "$IP" != "" ]; then
+  printf "\t%s\n" "${IP}"
+fi
+IP=$(docker inspect -f '{{range $p, $nw := .NetworkSettings.Networks}} {{$p}} -> {{$nw.IPAddress}} {{end}}' $DC | sed -E 's,^[ ]*,,')
+if [ "$IP" != "" ]; then
+  printf "\t%s\n" "${IP}"
+fi
+printf "Port mappings:\n\t"
+docker inspect -f '{{range $p, $conf := .NetworkSettings.Ports}} {{if $conf}} {{$p}} -> {{(index $conf 0).HostPort}} {{end}} {{end}}' $DC | sed -E 's,^[ ]*,,'

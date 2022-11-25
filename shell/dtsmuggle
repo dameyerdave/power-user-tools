@@ -1,0 +1,29 @@
+#!/bin/bash
+
+function usage {
+  echo "USAGE: $(basename $0) image ssh_spec"
+  exit 1
+}
+
+if [ $# -lt 2 ]; then
+  usage
+fi
+
+# replace / with _ in image
+IMG="$1"
+IMG_FILE="${1//\//_}"
+SSH="$2"
+TMP=$(mktemp /tmp/dtsmuggle.XXXXXX)
+
+# This is needed if the image is not locally available
+# docker pull ${IMG}
+docker save ${IMG} -o ${TMP}.tar
+gzip ${TMP}.tar 
+mv ${TMP}.tar.gz /tmp/${IMG_FILE}.tar.gz
+rsync -avzP /tmp/${IMG_FILE}.tar.gz ${SSH}:/tmp/
+ssh ${SSH} -t "bash -ic 'source .profile && docker load -i /tmp/${IMG}.tar.gz'" 
+
+rm -f ${TMP}*
+rm -f /tmp/${IMG_FILE}*
+
+

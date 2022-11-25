@@ -1,5 +1,5 @@
 install:
-	@python setup.py
+	@python setup.py install
 clean:
 	@rm -rf build dist *.egg-info
 build:

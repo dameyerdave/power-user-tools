@@ -1,0 +1,20 @@
+#!/bin/bash
+
+if [ -f docker-compose.yml ]; then
+  if [ "$1" != "" ]; then
+    docker-compose pull ${1}
+    docker-compose build --no-cache ${1}
+  fi
+  OVERRIDE=''
+  if [ -f docker-compose.override.yml ]; then
+    OVERRIDE='-f docker-compose.override.yml'
+  fi
+  APPEND=''
+  if [ "$1" != "" ]; then
+    APPEND="--no-deps ${1}"
+  fi
+  docker-compose -f docker-compose.yml ${OVERRIDE} up --quiet-pull --build --force-recreate -d ${APPEND}
+else
+	echo "No docker-compose.yml in current directory!"
+	exit 1
+fi

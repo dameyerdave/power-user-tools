@@ -1,0 +1,28 @@
+#!/bin/bash
+
+function usage {
+  echo "USAGE: $(basename $0) list|create|merge <ID>"
+  exit 1
+}
+
+ACTION="${1:-list}"
+
+if [ "${ACTION}" = "list" ]; then
+  hub pr list
+elif [ "${ACTION}" = "create" ]; then
+  hub pull-request
+elif [ "${ACTION}" = "merge" ]; then
+  ID="$2"
+  if [ "${ID}" != "" ]; then
+    URL=$(hub pr show ${ID} -u)
+    hub merge ${URL}
+    git fetch origin refs/pull/${ID}/head
+    git merge FETCH_HEAD --no-ff -m "Merge pull request #${ID}"
+  else
+    usage
+  fi
+else
+  usage
+fi
+
+exit 0

@@ -1,0 +1,13 @@
+#!/bin/bash
+
+if [ $# -lt 3 ]; then
+  echo "USAGE: $(basename $0) connection rport lport"
+  exit 1
+fi
+
+CONN="$1"
+RPORT="$2"
+LPORT="$3"
+
+
+ssh -4 -N -T -R ${RPORT}:localhost:${LPORT} ${CONN}

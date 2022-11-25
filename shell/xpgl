@@ -1,0 +1,13 @@
+#!/bin/bash
+
+N=0
+while read commit
+do
+  N=$(expr $N + 1)
+  H=$(echo $commit | cut -d'#' -f 1)
+  D=$(echo $commit | cut -d'#' -f 2)
+  S=$(echo $commit | cut -d'#' -f 3)
+  WHO=$(echo $commit | cut -d'#' -f 4)
+  WHEN=$(echo $commit | cut -d'#' -f 5)
+  printf "%4d %-7s %-20s %-20s %s %s\n" "${N}" "${H}" "${WHO}" "${WHEN}" "${S}" "${D}"
+done < <(git --no-pager log -n 10 "$@" --pretty="%h#%d#%s#%cn#%cr")

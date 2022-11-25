@@ -1,0 +1,58 @@
+#!/bin/bash
+
+IGNORE_OVERRIDE=0
+OVERRIDE=''
+
+if [ -f .env ]; then
+  source .env
+  if [ -z "${DCC_ENV}" ]; then
+    DCC_ENV=''
+  else
+    echo "Using environment: ${DCC_ENV}"
+  fi
+else
+  echo "No .env in this directory."
+fi
+
+if [ "$1" == "-i" ]; then
+  IGNORE_OVERRIDE=1
+  shift
+fi
+
+if [ "$1" == "-o" ]; then
+  IGNORE_OVERRIDE=1
+  shift
+  OVERRIDE="-f ${1}"
+  shift
+fi
+
+if [ -d .git ]; then
+  if git rev-parse --is-inside-work-tree 2>&1 > /dev/null; then
+    echo "Generate git related environment variables:"
+    export GIT_VERSION=$(git describe --always)
+    export GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    export GIT_LASTCOMMITDATE=$(git log -1 --format=%cI)
+    export GIT_COMMITHASH=$(git rev-parse HEAD)
+    printf "%-20s: %s\n" "GIT_VERSION" "${GIT_VERSION}"
+    printf "%-20s: %s\n" "GIT_BRANCH" "${GIT_BRANCH}"
+    printf "%-20s: %s\n" "GIT_LASTCOMMITDATE" "${GIT_LASTCOMMITDATE}"
+    printf "%-20s: %s\n" "GIT_COMMITHASH" "${GIT_COMMITHASH}"
+  fi
+else
+  echo "This is not a git repository."
+fi
+
+if [ -f docker-compose.yml ]; then  
+  if [ $IGNORE_OVERRIDE == 0 ]; then
+    if [ -f docker-compose.override.yml ]; then
+      OVERRIDE+=' -f docker-compose.override.yml'
+    fi
+    if [ -f "docker-compose.${DCC_ENV}.yml" ]; then
+      OVERRIDE+=" -f docker-compose.${DCC_ENV}.yml"
+    fi
+  fi
+	docker-compose -f docker-compose.yml ${OVERRIDE} "$@"
+else
+	echo "No docker-compose.yml in current directory!"
+	exit 1
+fi

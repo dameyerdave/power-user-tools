@@ -1,0 +1,12 @@
+#!/bin/bash
+USR=0
+
+if [ "$2" != "" ]; then
+    USR="$2"
+fi
+
+DC=$(docker ps -a --format "{{.Names}}" | grep "$1" | head -1)
+#DC="$1"
+
+docker top $DC 2>&1 >/dev/null || docker run -u ${USR} -it $DC /bin/bash || docker run -u ${USR} -it $DC /bin/sh
+docker top $DC 2>&1 >/dev/null && docker exec -u ${USR} -it $DC /bin/bash || docker exec -u ${USR} -it $DC /bin/sh

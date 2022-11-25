@@ -1,0 +1,19 @@
+#!/bin/bash
+
+GREP='tee'
+FILTER=''
+if [ "${1}" == "-d" ]; then
+    FILTER='--filter dangling=true'
+elif [ "${1}" != "" ]; then
+    GREP="grep ${1}"
+fi
+
+while read line
+do
+    _repo=$(echo $line | cut -d'#' -f 1)
+    _tag=$(echo $line | cut -d'#' -f 2)
+    _created=$(echo $line | cut -d'#' -f 3)
+    _size=$(echo $line | cut -d'#' -f 4)
+    printf "%-55s %10s  (%s)\n" "${_repo}:${_tag}" "${_size}" "${_created}"
+done < <(docker images ${FILTER} --format "{{.Repository}}#{{.Tag}}#{{.CreatedSince}}#{{.Size}}" | ${GREP})
+

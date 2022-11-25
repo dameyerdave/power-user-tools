@@ -1,0 +1,60 @@
+#!/bin/bash
+
+function usage {
+	echo "USAGE: $(basename $0) host [-u user] [-p port] [-k key]"
+	echo "    -u user: the user to authenticate at the destination host (default: whoami)"
+	echo "    -p port: the ssh port at the destination host (default: 22)"
+	echo "    -k key:  the key to authenticate at the destination host (default: ~/.ssh/<user>)"
+	exit 1
+}
+
+USER="$(whoami)"
+OWNKEY=''
+HOST="$1"; shift
+if [ "${HOST}" == "last" -a -f $(dirname $0)/.host ]; then
+	HOST=$(cat $(dirname $0)/.host)	
+else
+	echo "${HOST}" > $(dirname $0)/.host
+fi
+PORT=22
+FORCE=0
+
+if [ "${HOST}" == "" ]; then
+	usage
+fi
+
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+
+	case $key in
+   	-u)
+   	 	USER="$2"
+   	 	shift 2
+   	 	;;
+   	-p)
+   	 	PORT="$2"
+   	 	shift 2
+   	 	;;
+   	-k)
+   	 	OWNKEY="$2"
+   	 	shift 2
+   	 	;;
+   	 *)
+   		usage
+   	 	;;
+	esac
+done
+
+if [ "${OWNKEY}" != "" ]; then
+	KEY=~/.ssh/${OWNKEY}
+else
+	KEY=~/.ssh/${USER}
+fi
+
+if [ -f ${KEY} ]; then
+	exec ssh -i ${KEY} ${USER}@${HOST} -p ${PORT}
+else
+	echo "No key found for user ${USER}."
+	echo "Please use 'stinit' to create a key and deploy it to the host."
+fi

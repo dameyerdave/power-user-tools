@@ -18,15 +18,35 @@ setup(
     packages=find_packages(),
     entry_points={
             'console_scripts': [
-                'sussh = commands.sussh:main',
-                'surtun = commands.shellex:surtun'
+                'sussh = commands.sshutils:sussh',
+                'surtun = commands.sshutils:surtun',
+                'dcc = commands.dockertools:dcc',
+                'dtls = commands.dockertools:dtls',
+                'dtail = commands.dockertools:dtail',
+                'dtsh = commands.dockertools:dtsh',
+                'dtclean = commands.dockertools:dtclean',
+                'dtins = commands.dockertools:dtins',
             ]
     },
-    classifiers=(
+    scripts=[
+        'shell/dtip',
+        'shell/dtports',
+        'shell/dtnet',
+        'shell/dtimg',
+        'shell/dtstart',
+        'shell/dtstop',
+        'shell/dtrestart',
+        'shell/dtrm',
+        'shell/xpgl',
+        'shell/xppr',
+        'shell/xprandpw',
+        'shell/xprmhistory',
+    ],
+    classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
-    ),
+    ],
     keywords='power user tools ssh sshd reverse tunnel docker easy development',
     install_requires=requirements,
     zip_safe=False

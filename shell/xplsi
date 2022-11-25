@@ -1,0 +1,19 @@
+#!/bin/bash
+
+# hub issue [-a ASSIGNEE] [-c CREATOR] [-@ USER] [-s STATE] [-f FORMAT] [-M MILESTONE] [-l LABELS] [-d DATE] [-o SORT_KEY [-^]] [-L LIMIT]
+# hub issue show [-f FORMAT] NUMBER
+# hub issue create [-oc] [-m MESSAGE|-F FILE] [--edit] [-a USERS] [-M MILESTONE] [-l LABELS]
+# hub issue update NUMBER [-m MESSAGE|-F FILE] [--edit] [-a USERS] [-M MILESTONE] [-l LABELS] [-s STATE]
+# hub issue labels [--color]
+# hub issue transfer NUMBER REPO
+
+ACTION="${1:-}"
+shift
+
+if [ "$ACTION" != "" ]; then
+  ADD_FORMAT="%n---------%n%b%n---------%n"
+fi
+
+hub issue ${ACTION} -f "%sC%>(8)%i%Creset %l %t (%U) [%as]${ADD_FORMAT}%n" $@
+
+exit 0

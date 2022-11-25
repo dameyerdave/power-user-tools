@@ -1,0 +1,27 @@
+#!/bin/bash
+
+function usage {
+    echo "USAGE $(basename $0)"
+    exit
+}
+
+export FILTER_BRANCH_SQUELCH_WARNING=1
+
+echo "The following files will be deleted:"
+git ls-files --exclude-standard --others --directory --ignored
+read -p "Do you want to proceed? [type 'yes'] " yes
+if [ "$yes" != "yes" ]; then
+    exit 0
+fi
+
+for f in $(git ls-files --exclude-standard --others --directory --ignored)
+do
+    echo "Removing $f from git including its history..."
+    git filter-branch --force --index-filter "git rm --cached --ignore-unmatch '$f'" --prune-empty --tag-name-filter cat -- --all
+    if [ $? -ne 0 ]; then
+        exit 1
+    fi
+done
+echo "DONE"
+echo ""
+echo "Plese use 'git push --force' to push the cleaned up version.'"

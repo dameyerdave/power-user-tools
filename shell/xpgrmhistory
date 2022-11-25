@@ -1,0 +1,18 @@
+#!/bin/bash
+
+function usage {
+    echo "USAGE $(basename $0) filename"
+    exit
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+FILENAME="${1}"
+
+# export FILTER_BRANCH_SQUELCH_WARNING=1; git filter-branch --tree-filter "rm -f ${FILENAME}" HEAD
+
+export FILTER_BRANCH_SQUELCH_WARNING=1; git filter-branch --force --index-filter \
+  "git rm --cached --ignore-unmatch ${FILENAME}" \
+  --prune-empty --tag-name-filter cat -- --all

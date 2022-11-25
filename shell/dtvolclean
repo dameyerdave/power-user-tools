@@ -1,0 +1,9 @@
+#!/bin/bash
+
+while read line
+do
+  vol=$(echo $line | awk '{print $2}')
+  if [ ${#vol} == 64 ]; then
+    docker volume rm ${vol}
+  fi
+done < <(docker volume ls)

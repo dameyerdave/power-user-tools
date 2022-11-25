@@ -1,0 +1,11 @@
+#!/bin/bash
+
+DCS=$(docker ps -a --format "{{.Names}}" | grep "$1")
+
+for DC in ${DCS}
+do
+    while read PORT 
+    do
+        printf "%-30s: %s\n" "${DC}" "${PORT}"
+    done < <(docker port ${DC})
+done

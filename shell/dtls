@@ -1,0 +1,15 @@
+#!/bin/bash
+
+if [ "$1" != "" ]; then
+    FILTER="--filter name=$1"
+fi
+
+while read line
+do
+    _name=$(echo $line | cut -d'#' -f 1)
+    _status=$(echo $line | cut -d'#' -f 2)
+    _image=$(echo $line | cut -d'#' -f 3)
+    _restart=$(echo $line | cut -d'#' -f 4)
+    printf "%-50s: %-50s %s\n" "${_name}" "${_status}" "${_image}"
+done < <(docker ps ${FILTER} -a --format "{{.Names}}#{{.Status}}#{{.Image}}")
+

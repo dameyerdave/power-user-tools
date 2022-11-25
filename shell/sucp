@@ -1,0 +1,71 @@
+#!/bin/bash
+
+function usage {
+	echo "USAGE: $(basename $0) file host [-d dir] [-u user] [-p port] [-k key]"
+	echo "    -d dir: the directory to copy the file to  at the destination host"
+	echo "    -u user: the user to authenticate at the destination host"
+	echo "    -p port: the ssh port at the destination host"
+	echo "    -k key: the key to authenticate at the destination host"
+	exit 1
+}
+
+USER="$(whoami)"
+OWNKEY=''
+FILE="$1"; shift
+HOST="$1"; shift
+if [ "${HOST}" == "last" -a -f $(dirname $0)/.host ]; then
+    HOST=$(cat $(dirname $0)/.host)
+else
+    echo "${HOST}" > $(dirname $0)/.host
+fi
+DIR='/var/tmp'
+PARAMS=''
+PORT=22
+FORCE=0
+
+if [ "${HOST}" == "" -o "${FILE}" == "" -o "${DIR}" == "" ]; then
+	usage
+fi
+
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+
+	case $key in
+   	-d)
+   	 	DIR="$2"
+   	 	shift 2
+   	 	;;
+   	-u)
+   	 	USER="$2"
+   	 	shift 2
+   	 	;;
+   	-p)
+   	 	PORT="$2"
+   	 	shift 2
+   	 	;;
+   	-k)
+   	 	OWNKEY="$2"
+   	 	shift 2
+   	 	;;
+   	 *)
+   		usage
+   	 	;;
+	esac
+done
+
+if [ "${OWNKEY}" != "" ]; then
+	KEY=~/.ssh/${OWNKEY}
+else
+	KEY=~/.ssh/${USER}
+fi
+
+if [ -d ${FILE} ]; then
+	PARAMS="-r"
+fi
+if [ -f ${KEY} ]; then
+	scp -i ${KEY} ${PARAMS} -P ${PORT} ${FILE} ${USER}@${HOST}:${DIR}
+else
+	echo "No key found for user ${USER}."
+	echo "Please use 'stinit' to create a key and deploy it to the host."
+fi

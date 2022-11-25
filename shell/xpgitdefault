@@ -1,0 +1,5 @@
+#!/bin/bash
+
+git config pull.rebase true
+git config fetch.prune true
+git config diff.colorMoved zebra

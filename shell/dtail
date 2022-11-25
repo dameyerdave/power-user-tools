@@ -1,0 +1,13 @@
+#!/bin/bash
+
+function usage {
+    echo "USAGE: $(basename $0) container-name"
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+DC=$(docker ps -a --format "{{.Names}}" | grep "$1" | head -1)
+
+docker logs -f "${DC}"

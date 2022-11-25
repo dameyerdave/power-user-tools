@@ -1,0 +1,129 @@
+#!/bin/bash
+
+function usage {
+  echo "USAGE: $(basename $0) favorite [params]"
+	echo ""
+	echo "Favorites are:"
+  echo "  - ."
+	echo "  - mongo [name] [port] - a mongo database"
+  echo "  - splunk a splunk instance"
+  echo "  - sshd - an ssh daemon"
+  echo "  - proxy - a tiny web proxy"
+  echo "  - registry - a docker registry proxy"
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+FAV="$1"
+
+if [ "$FAV" = '.' ]; then
+  if [ -f Dockerfile ]; then
+    while read line
+    do
+      if [[ ! -z "$line" ]] && [[ $line != \#* ]]; then
+        if [[ $line == EXPOSE* ]]; then
+          PORTS+=' -p '
+          PORT=$(echo "${line}" | cut -d' ' -f2)
+          if [[ $PORT == *"/"* ]]; then
+            PORT=${PORT%%/*}
+          fi
+          PORTS+="${PORT}:${PORT}"
+        fi
+      fi
+    done < <(cat Dockerfile)
+    DIR=$(pwd -P)
+    TMP=${DIR##*/}
+    docker build -t ${TMP} .
+    shift
+    ENV=''
+    if [ -f .env ]; then
+      echo "Setting environment variables from .env"
+      while read line
+      do
+        if [[ ! -z "$line" ]] && [[ $line != export* ]]; then
+          # if [ ! -z "$ENV" ]; then
+          ENV+=' -e '
+          # fi
+          # ENV+='"'
+          ENV+=$(echo "${line}" | cut -d= -f1)
+          eval "export ${line}"
+          # ENV+='"'
+        fi
+      done < <(cat .env)
+    fi
+    env
+    echo "docker run ${ENV} ${PORTS} -ti --rm --name '${TMP}' $* ${TMP}"
+    exec docker run ${ENV} ${PORTS} -ti --rm --name "${TMP}" $* ${TMP}
+  else
+    echo "No Dockerfile found in current directory."
+  fi
+elif [ "$FAV" = "mongo" ]; then
+  NAME='mongo'
+  if [ "$2" != "" ]; then
+    NAME="$2"
+  fi
+  PORT=27017
+  if [ "$3" != "" ]; then
+    PORT="$3"
+  fi
+	docker run -it -d --name ${NAME} --hostname ${NAME} -p ${PORT}:27017 --restart unless-stopped mongo:latest
+elif [ "$FAV" = "splunk" ]; then
+	docker run --name splunk --hostname splunk -p 8000:8000 -p 8089:8089 -p 9997:9997 --restart unless-stopped -d -e "SPLUNK_START_ARGS=--accept-license" -e "SPLUNK_PASSWORD=splunk01" splunk/splunk:latest
+elif [ "$FAV" = "sshd" ]; then
+  if [ ! -f ~/.ssh/tunnel ]; then
+    ssh-keygen -t ed25519 -b 4096 -C tunnel -f ~/.ssh/tunnel -N ''
+  fi
+  KEY=$(cat ${HOME}/.ssh/tunnel.pub)
+  VOL="${HOME}/.docker/sshd/config"
+  if [ ! -d ${VOL} ]; then
+    mkdir -p ${VOL}
+  fi
+  docker run -d \
+  --name=sshd \
+  --hostname=sshd \
+  -e PUID=1000 \
+  -e PGID=1000 \
+  -e TZ=Europe/Zurich \
+  -e SUDO_ACCESS=false \
+  -e PASSWORD_ACCESS=false \
+  -e PUBLIC_KEY="${KEY}" \
+  -e USER_NAME=tunnel \
+  -p 2222:2222 \
+  -v ${VOL}:/config \
+  --restart unless-stopped \
+  ghcr.io/linuxserver/openssh-server
+  # wait until sshd is stared!!
+  docker exec -it sshd /bin/sed -i 's/^AllowTcpForwarding no/AllowTcpForwarding yes/' /etc/ssh/sshd_config
+  docker exec -it sshd /bin/sed -i 's/^#UseDNS no/UseDNS no/' /etc/ssh/sshd_config
+elif [ "$FAV" = "proxy" ]; then
+  docker run -d \
+  --name proxy \
+  --hostname proxy \
+  -p 8888:8888 \
+  --restart unless-stopped \
+  vimagick/tinyproxy
+elif [ "$FAV" = "registry" ]; then
+  docker run -d \
+  --name registry \
+  --hostname registry \
+  -e REGISTRY_PROXY_REMOTEURL=https://registry-1.docker.io \
+  -e REGISTRY_HTTP_ADDR=127.0.0.1:15000 \
+  --net host \
+  --restart unless-stopped \
+  registry:2
+  # -e HTTP_PROXY=http://localhost:3128 \
+  # -e HTTPS_PROXY=http://localhost:3128 \
+  # -e REGISTRY_PROXY_USERNAME=dameyerdave \
+  # -e REGISTRY_PROXY_PASSWORD=99409298-ca91-4067-bbe8-3893998ea082 \
+elif [ "$FAV" = "initvep" ]; then
+  mkdir -p ~/vep_data
+  # docker run -t -i -v $HOME/vep_data:/opt/vep/.vep ensemblorg/ensembl-vep perl INSTALL.pl -a cfp -s homo_sapiens -y GRCh38 -g all
+  docker run -t -i -v $HOME/vep_data:/opt/vep/.vep ensemblorg/ensembl-vep sh -c "perl INSTALL.pl --AUTO cfp --NO_UPDATE --CACHE_VERSION 104 --PLUGINS all --SPECIES homo_sapiens_merged --ASSEMBLY GRCh37"
+elif [ "$FAV" = "vep" ]; then
+  mkdir -p ~/vep_data
+  shift
+  docker run -t -i -v $HOME/vep_data:/opt/vep/.vep -v $(pwd):/tmp/data ensemblorg/ensembl-vep ./vep $@
+  # EXAMPLE: dtrun vep --verbose --format vcf --offline --merged --cache --species homo_sapiens --use_given_ref --canonical --force_overwrite --hgvs --hgvsg --symbol --af_gnomad --uniprot --max_af --sift b --variant_class -i /tmp/data/test.vcf --json -o -
+fi

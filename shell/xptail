@@ -1,0 +1,11 @@
+#!/bin/bash
+
+tail "$@" | awk '
+    function color(c,s) {
+            printf("\033[%dm%s\033[0m\n",30+c,s)
+    }
+    /ERROR/ {color(1,$0);next}
+    /WARNING/ {color(3,$0);next}
+    /INFO/ {color(2,$0);next}
+    /DEBUG/ {color(6,$0);next}
+    {print}'

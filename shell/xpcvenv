@@ -1,0 +1,13 @@
+#!/bin/bash
+
+function usage {
+    echo "USAGE: $(basename $0) from to"
+    exit 1
+}
+
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+find venv/bin -type f | xargs -0 perl -pi -e "s#${1}#${2}#g"
+exit 0

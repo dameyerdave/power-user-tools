@@ -1,0 +1,18 @@
+#!/bin/bash
+
+first=1
+while read network
+do
+	if [ $first -eq 1 ]; then
+		first=0
+		continue
+	fi
+	NET=$(echo $network | awk '{print $2}')
+	echo "${NET}"
+	while read cont
+	do
+		NAME=$(echo $cont | cut -d'#' -f1)
+		IP=$(echo $cont | cut -d'#' -f2)
+		printf "   +-- %-20s %s\n" "${NAME}" "${IP}"
+	done < <(docker network inspect ${NET} -f "{{json .Containers }}" | jq -r '.[] | .Name+"#"+.IPv4Address')
+done < <(docker network ls)

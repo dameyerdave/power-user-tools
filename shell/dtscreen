@@ -1,0 +1,9 @@
+#!/bin/bash
+
+printf "Id: "
+docker inspect -f "{{ .Id }}" $1
+printf "Mounts:\n"
+docker inspect -f '{{range $p, $mount := .Mounts}} {{$mount.Source}} {{end}}' $1 | tr ' ' '\n' | grep -v "^$"
+printf "\nA screen session will start on key press, please use ctrl-a k to kill the session..."; read
+
+screen -O -t $1 ~/Library/Containers/com.docker.docker/Data/com.docker.driver.amd64-linux/tty

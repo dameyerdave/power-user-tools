@@ -1,5 +1,7 @@
 dist
 build
-shell
 *.egg-info
 Pipfile
+.DS_Store
+.env*
+.vscode

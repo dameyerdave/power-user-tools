@@ -1,0 +1,178 @@
+#!/bin/bash
+# require daemon
+# require tcptunnel on remotehost
+
+function usage {
+	echo "USAGE: $(basename $0) start|stop|status -h host -l localport -r remoteport [-u user] [-n name] [-k key] [-t]"
+	echo ""
+	echo "  <connection name>:  <localhost>:<localport> o==o <user>@<remotehost>:<remoteport> o== <tcptunnel>:<remoteport>  "
+	echo ""
+	echo "    -h host:       the destination host to connect to"
+	echo "    -l localport:  the port on the local host to use for the ssh tunnel"
+	echo "    -r remoteport: the remote port to use for the ssh tunnel"
+	echo "    -u user:       the user to authenticate at the destination host"
+	echo "    -n name:       the name of the ssh tunnel"
+	echo "    -k key:        the key to authenticate at the destination host"
+	echo "    -t:            open tcptunnel on remote host"
+	exit 1	
+}
+
+function parse_daemon {
+	local line="$1"
+	NAME=$(echo $line | sed -E 's,.*-n ([^ ]+) .*,\1,')
+        USER=$(echo $line | sed -E 's,.* ([^@]+)@.*,\1,')
+        HOST=$(echo $line | sed -E 's,.*@([^ ]+) .*,\1,')
+        KEY=$(echo $line | sed -E 's,.*-i ([^ ]+) .*,\1,')
+        LPORT=$(echo $line | sed -E 's,.*-R [^:]+:[^:]+:([^ ]+).*,\1,')
+        RPORT=$(echo $line | sed -E 's,.*-R ([^:]+):.*,\1,')
+	echo "${NAME}#${USER}#${HOST}#${KEY}#${LPORT}#${RPORT}"
+}
+
+USER="$(whoami)"
+ACTION="$1"
+OWNNAME=''
+OWNKEY=''
+TCPTUNNEL=0
+IP=''
+shift
+
+if [ "${ACTION}" == "" ]; then
+	usage
+fi
+
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+
+	case $key in
+   	-u)
+   	 	USER="$2"
+   	 	shift 2
+   	 	;;
+   	-h)
+   	 	HOST="$2"	
+		if [[ "$HOST" =~ [0-9]+\.[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+			IP=$HOST
+		else
+			IP=$(host ${HOST} | cut -d' ' -f4)
+		fi
+   	 	shift 2
+   	 	;;
+   	-l)
+   	 	LPORT="$2"
+   	 	shift 2
+   	 	;;
+   	-r)
+   	 	RPORT="$2"
+   	 	shift 2
+   	 	;;
+   	-n)
+   	 	OWNNAME="$2"
+   	 	shift 2
+   	 	;;
+   	-k)
+   	 	OWNKEY="$2"
+   	 	shift 2
+   	 	;;
+	-t)
+		TCPTUNNEL=1
+		shift 1
+		;;
+   	*)
+   		usage
+   	 	;;
+	esac
+done
+
+if [ "${OWNKEY}" == "" ]; then
+	KEYFILE=~/.ssh/${USER}
+else
+	KEYFILE=~/.ssh/${OWNKEY}
+fi
+
+if [ ! -f $KEYFILE -a "${ACTION}" == "start" ]; then
+	echo "Keyfile ${KEYFILE} does not exist!"
+	echo "\tUse suinit to create one."
+	exit 1
+fi
+
+if [ "${OWNNAME}" == "" -a "${ACTION}" != "status" ]; then
+	if [ "${LPORT}" != "" -a "${RPORT}" != "" -a "${HOST}" != "" ]; then
+		NAME="${LPORT}_${HOST}_${RPORT}"
+	else
+		echo "Some parameters are missing!"
+        	echo "Give at least -h host -l localport -r remoteport OR -n name"
+        	exit 1
+	fi
+else
+	NAME="${OWNNAME}"
+fi
+case $ACTION in
+start)
+	if [ "${LPORT}" != "" -a "${RPORT}" != "" -a "${HOST}" != "" ]; then
+		if ssh -R ${RPORT}:localhost:${LPORT} -i ${KEYFILE} ${USER}@${HOST} 'exit'; then
+			daemon -n "${NAME}" -U -r -X "ssh -R ${RPORT}:localhost:${LPORT} -i ${KEYFILE} ${USER}@${HOST} -N" 
+			until daemon --running -n "${NAME}"; do
+				sleep 1
+			done
+			echo "Started SSH tunnel '${NAME}': localhost:${LPORT} <- ${USER}@${HOST}:${RPORT}."
+			if [ ${TCPTUNNEL} -eq 1 ]; then
+				if [ "${IP}" == "" ]; then
+					echo "Cannot resolv hostname ${HOST}!"
+					exit 1
+				fi
+				if ! ssh -i ${KEYFILE} ${USER}@${HOST} "ps -ef | grep 'tcptunnel --local-port=${RPORT}' | grep -v grep" 2>&1 >/dev/null; then
+					if ! ssh -i ${KEYFILE} ${USER}@${HOST} 'test -x "$(command -v tcptunnel)"'; then
+						echo "Cannot start tcptunnel because its not installed on the remote host!"
+						exit 1
+					fi
+					ssh -i ${KEYFILE} ${USER}@${HOST} "nohup tcptunnel --local-port=${RPORT} --remote-port=${RPORT} --remote-host=localhost --bind-address=${IP} --fork --stay-alive >/dev/null 2>/dev/null </dev/null &"
+					echo "Started tcp tunnel on remote host."
+				else
+					echo "Tcp tunnel on remote host already running."
+				fi
+			fi
+		else
+			echo "Error creating SSH tunnel!"
+		fi
+	else
+		echo "Some parameters are missing!"
+		echo "Give at least -h host -l localport -r remoteport"
+		exit 1
+	fi
+	;;
+stop)
+	if daemon --running -n "${NAME}"; then
+		DAEMON=$(ps -ef | grep "daemon -n ${NAME}" | grep -v grep)
+		SPEC=$(parse_daemon "${DAEMON}")
+		KEYFILE=$(echo "$SPEC" | cut -d'#' -f4)
+		USER=$(echo "$SPEC" | cut -d'#' -f2)
+		HOST=$(echo "$SPEC" | cut -d'#' -f3)
+		RPORT=$(echo "$SPEC" | cut -d'#' -f6)
+		if ssh -i ${KEYFILE} ${USER}@${HOST} "ps -ef | grep 'tcptunnel --local-port=${RPORT}' | grep -v grep" 2>&1 >/dev/null; then
+			TCPTUNPID=$(ssh -i ${KEYFILE} ${USER}@${HOST} "ps -ef | grep 'tcptunnel --local-port=${RPORT}' | grep -v grep | awk '{print \$2}'")
+			ssh -i ${KEYFILE} ${USER}@${HOST} "kill -9 ${TCPTUNPID}"		
+			echo "Stoped tcptunnel on remote host"
+		fi
+		daemon --stop -n "${NAME}"
+		until ! daemon --running -n "${NAME}"; do
+			sleep 1
+		done
+		echo "Stoped SSH tunnel '${NAME}'"
+	else
+		echo "SSH tunnel '${NAME}' not found!"
+		exit 1
+	fi
+	;;
+status)
+	ps -ef | grep "daemon -n" | grep -v grep | while read line 
+	do 
+		echo $(parse_daemon "$line" | cut -d'#' -f1)
+	done
+	;;		
+*)
+	usage
+	;;
+esac
+
+exit 0

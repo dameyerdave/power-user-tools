@@ -1,0 +1,712 @@
+#!/bin/bash
+
+function usage {
+  echo "USAGE: $(basename $0) project_name app_id"
+  exit 1
+}
+
+if [ $# -lt 2 ]; then
+  usage
+fi
+
+# The project name to use
+PROJECT_NAME="$1"
+# To setup ports use an id
+APP_ID=$2
+
+DIR=$(pwd)
+
+function die {
+  echo "Error occured. Closed unexpectedly."
+  exit 1
+}
+
+######
+# API
+######
+
+if [ ! -d api ]; then
+  mkdir -p api
+  mkdir -p api/static
+  mkdir -p api/media
+
+  touch api/static/favicon.ico
+
+  cd ${DIR}/api
+  cat > Dockerfile << EOF
+FROM python:3.9.9-alpine3.15
+
+ENV PYTHONUNBUFFERED 1
+
+ARG GIT_VERSION
+ARG GIT_BRANCH
+ARG GIT_LASTCOMMITDATE
+
+ENV GIT_VERSION=\${GIT_VERSION}
+ENV GIT_BRANCH=\${GIT_BRANCH}
+ENV GIT_LASTCOMMITDATE=\${GIT_LASTCOMMITDATE}
+
+COPY ./requirements.txt /requirements.txt
+RUN apk add --update --no-cache postgresql-client jpeg-dev git bash
+RUN apk add --update --no-cache --virtual .tmp-build-deps \
+  gcc libc-dev linux-headers postgresql-dev musl-dev zlib zlib-dev libffi-dev
+RUN apk --no-cache add nodejs yarn --repository=http://dl-cdn.alpinelinux.org/alpine/edge/community
+RUN rm -f package.json yarn.lock
+RUN pip --disable-pip-version-check install --upgrade pip
+RUN pip install -r /requirements.txt
+RUN apk del .tmp-build-deps
+
+COPY ./app /app
+WORKDIR /app
+
+RUN mkdir -p /vol/web/media
+RUN mkdir -p /vol/web/static
+RUN adduser -D user
+RUN chown -R user:user /vol/
+RUN chmod -R 755 /vol/web
+USER user
+EOF
+
+  ###
+  # Python development requirements
+  ###
+
+  cat > requirements_dev.txt << EOF
+# dev
+flake8
+autopep8
+EOF
+  pipenv install --three --skip-lock -r requirements_dev.txt || die
+
+  ###
+  # Python requirements
+  ###
+
+  cat > requirements.txt << EOF
+# Django dependencies
+Django
+djangorestframework
+django-cors-headers
+django-filter
+psycopg2
+Pillow
+django-computed-property
+drf-jwt
+drf-schema-adapter
+
+# MkDocs dependecies
+git+https://github.com/dameyerdave/django-mkdocs.git
+mkdocs
+mkdocs-include-markdown-plugin
+mkdocs-material-extensions
+mkdocs-material
+EOF
+  pipenv run pip install -r requirements.txt || die
+  pipenv run pip freeze > requirements.txt || die
+
+  ###
+  # Create django app
+  ###
+
+  pipenv run django-admin startproject ${PROJECT_NAME} || die
+  mv ${DIR}/api/${PROJECT_NAME} ${DIR}/api/app
+
+  cd ${DIR}/api/app
+  pipenv run ./manage.py startapp core
+
+  ###
+  # MkDocs
+  ###
+
+  cd ${DIR}/api/app/
+  pipenv run mkdocs new docs || die
+  cat > ${DIR}/api/app/docs/mkdocs.yml << EOF
+site_name: ${PROJECT_NAME} Documentation
+use_directory_urls: false
+docs_dir: docs
+site_dir: site
+
+# Some extra stuff
+theme:
+  name: readthedocs
+extra_css:
+  - css/default.css
+nav:
+  - Home: index.md
+  - Changelog: CHANGELOG.md
+plugins:
+  - include-markdown
+  - search:
+      lang: en
+markdown_extensions:
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - toc:
+      permalink: "#"
+      baselevel: 2
+      separator: "_"
+  - attr_list
+EOF
+
+  mkdir -p ${DIR}/api/app/docs/css
+  cat > ${DIR}/api/app/docs/css/default.css << EOF
+img.twemoji {
+  height: 1.2em;
+  border: 0px;
+}
+EOF
+
+  mkdir -p ${DIR}/api/app/docs/templates
+  cat > ${DIR}/api/app/docs/templates/CHANGELOG.ejs << EOF
+# Changelog
+## Current Version
+<% commits.forEach(function (commit) { %>
+  <% if (commit.tag) { %>
+## Version <%= commit.tag %>
+  <% } %>
+* __<%= commit.title %>__
+  <p>
+  <%= commit.messageLines.join("\n    ") %>
+  <small>@ <%= dateFnsFormat(commit.committerDate, "YYYY-MM-DD HH:mm:ss")%> (<i><%= commit.sha1.slice(0,8) %></i>)</small>
+  </p>
+<% }) %>
+EOF
+
+  mkdir -p ${DIR}/api/app/docs/scripts
+  cat > ${DIR}/api/app/docs/scripts/generate_changelog.sh << EOF
+#!/usr/bin/env bash
+# PREREQUISITS:
+# yarn add -D --modules-folder ./node_modules git-release-notes
+
+DIR="\$( cd -- "$( dirname -- "\${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+GRN="\${DIR}/node_modules/.bin/git-release-notes"
+CHANGELOG="\${DIR}/docs/docs/CHANGELOG.md"
+
+if [ ! -f \${GRN} ]; then
+  echo "Installing git-release-notes because it's not there..."
+  yarn add -D --modules-folder \${DIR}/node_modules git-release-notes
+fi
+
+first=\$(git log --reverse --pretty="%h" | head -1)
+last=HEAD
+
+echo "Generating CHANGELOG..."
+\${GRN} -p \${DIR} -b master \${first}..\${last} \${DIR}/templates/CHANGELOG.ejs > \${CHANGELOG}
+echo "CHANGELOG generated at \${CHANGELOG}."
+EOF
+  chmod +x ${DIR}/api/app/docs/scripts/generate_changelog.sh
+
+  cat >> ${DIR}/api/app/${PROJECT_NAME}/settings.py << EOF
+
+from datetime import timedelta as td
+
+LANGUAGE_CODE = 'en-us'
+TIME_ZONE = 'Europe/Zurich'
+USE_I18N = True
+USE_L10N = True
+USE_TZ = True
+
+STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
+
+MEDIA_ROOT = '/vol/web/media'
+STATIC_ROOT = '/vol/web/static'
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_jwt.authentication.JSONWebTokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication'
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+        'rest_framework.permissions.IsAuthenticated'
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend'
+    ],
+    'DEFAULT_METADATA_CLASS': 'meta.serializers.APIMetadata',
+}
+
+FIXTURE_DIRS = []
+
+JWT_AUTH = {
+    'JWT_ALLOW_REFRESH': True,
+    'JWT_EXPIRATION_DELTA': td(hours=1),
+    'JWT_REFRESH_EXPIRATION_DELTA': td(days=7),
+}
+
+# Mkdocs config
+PROJECT_DIR = str(BASE_DIR)
+DOCUMENTATION_ROOT = PROJECT_DIR + '/docs'
+DOCUMENTATION_HTML_ROOT = DOCUMENTATION_ROOT + '/site'
+DOCUMENTATION_XSENDFILE = False
+def DOCUMENTATION_ACCESS_FUNCTION(_): return True
+
+INSTALLED_APPS += [
+  'django_filters',
+  'corsheaders',
+  'rest_framework',
+  'rest_framework_jwt',
+  'rest_framework_jwt.blacklist',
+  'django_mkdocs',
+  '${PROJECT_NAME}',
+]
+
+MIDDLEWARE += [
+  'corsheaders.middleware.CorsMiddleware',
+]
+EOF
+
+  ###
+  # Meta
+  ###
+
+  mkdir -p meta
+  cd ${DIR}/api/app/meta
+  touch __init__.py
+  cat > apps.py << EOF
+from django.apps import AppConfig
+
+
+class MetaConfig(AppConfig):
+    default_auto_field = 'django.db.models.BigAutoField'
+    name = 'meta'
+EOF
+  cat > serilizers.py << EOF
+from rest_framework.metadata import SimpleMetadata
+from rest_framework.schemas.openapi import AutoSchema
+
+
+class APIMetadata(SimpleMetadata):
+    """
+    Extended metadata generator.
+
+    To use this we need to adjust the settings accordingly:
+    REST_FRAMEWORK = {
+        'DEFAULT_METADATA_CLASS': 'meta.serializers.APIMetadata',
+    }
+    """
+
+    def get_field_info(self, field):
+        field_info = super().get_field_info(field)
+
+        # Add extra validators using the OpenAPI schema generator
+        validators = {}
+        AutoSchema()._map_field_validators(field, validators)
+        extra_validators = ['format', 'pattern']
+        for validator in extra_validators:
+            if validators.get(validator, None):
+                field_info[validator] = validators[validator]
+
+        # Add additional data from serializer
+        field_info['initial'] = field.initial
+        field_info['field'] = field.field_name
+        field_info['write_only'] = field.write_only
+        if hasattr(field, 'choices') and field.choices:
+            field_info['choices'] = [
+                {
+                    'label': label,
+                    'value': value
+                }
+                for value, label in field.choices.items()
+            ]
+
+        return field_info
+EOF
+  fi
+
+  ###
+  # Management commands
+  ###
+
+  mkdir -p ${DIR}/api/app/${PROJECT_NAME}/management/commands
+  cd ${DIR}/api/app/${PROJECT_NAME}/management/commands
+  if [ ! -f initadmin.py ]; then
+    cat > initadmin.py << EOF
+from django.core.management.base import BaseCommand
+from django.contrib.auth import get_user_model
+from os import environ
+import logging
+logger = logging.getLogger(__name__)
+
+
+class Command(BaseCommand):
+
+    def handle(self, *args, **options):
+        superuser = environ.get('DJANGO_SU_NAME', 'admin')
+        User = get_user_model()
+        if not User.objects.filter(username=superuser).exists():
+            User.objects.create_superuser(
+                superuser, environ.get('DJANGO_SU_EMAIL', ''), environ.get('DJANGO_SU_PASSWORD', 'superuser'))
+            logger.info('Created superuser account')
+        else:
+            logger.info('Superuser exists')
+
+EOF
+  fi
+
+  if [ ! -f wait_for_db.py ]; then
+    cat > wait_for_db.py << EOF
+import time
+
+from django.db import connections
+from django.db.utils import OperationalError
+from django.core.management.base import BaseCommand
+
+
+class Command(BaseCommand):
+    """Django command to pause execution until database is available"""
+
+    def handle(self, *args, **options):
+        self.stdout.write('Waiting for database...')
+        db_conn = None
+        while not db_conn:
+            try:
+                db_conn = connections['default']
+            except OperationalError:
+                self.stdout.write('Database unavailable, waiting 1 second...')
+                time.sleep(1)
+
+        self.stdout.write(self.style.SUCCESS('Database available!'))
+EOF
+  fi
+
+######
+# UI
+######
+
+if [ ! -d ${DIR}/ui ]; then
+  mkdir -p ${DIR}/ui
+  cd ${DIR}/ui
+
+  ###
+  # UI: Dockerfile
+  ###
+
+  cat > Dockerfile << EOF
+# From node version 17 on it uses ssl v3 which is not supported
+# in this application
+FROM node:16.13-bullseye as build-stage
+
+ARG GIT_VERSION
+ARG GIT_BRANCH
+ARG GIT_LASTCOMMITDATE
+ENV VUE_APP_VERSION=\${GIT_VERSION}
+ENV VUE_APP_BRANCH=\${GIT_BRANCH}
+ENV VUE_APP_LASTCOMMITDATE=\${GIT_LASTCOMMITDATE}
+
+COPY ./app /app
+WORKDIR /app
+RUN npx browserslist@latest --update-db
+RUN yarn install
+RUN yarn build
+
+FROM nginx:stable as production-stage
+COPY --from=build-stage /app/dist /app
+
+# Adjust values fom template using env vars
+COPY nginx.conf /etc/nginx/nginx.conf
+CMD /bin/bash -c "nginx -g 'daemon off;'"
+EOF
+
+  ###
+  # UI: Dockerfile for development
+  ###
+
+  cat > Dockerfile.development << EOF
+FROM node:17-alpine
+
+ARG GIT_VERSION
+ARG GIT_BRANCH
+ARG GIT_LASTCOMMITDATE
+ENV VUE_APP_VERSION=\${GIT_VERSION}
+ENV VUE_APP_BRANCH=\${GIT_BRANCH}
+ENV VUE_APP_LASTCOMMITDATE=\${GIT_LASTCOMMITDATE}
+
+COPY ./app /app
+WORKDIR /app
+RUN npx browserslist@latest --update-db
+RUN yarn install && yarn upgrade
+
+CMD yarn serve --host 0.0.0.0 --port 8080
+EOF
+
+  ###
+  # Nginx config
+  ###
+
+  cat > nginx.conf << EOF
+user                        nginx;
+worker_processes            1;
+error_log                   /var/log/nginx/error.log debug;
+pid                         /var/run/nginx.pid;
+events {
+  worker_connections        1024;
+}
+http {
+  resolver                  127.0.0.11 ipv6=off;
+  include                   /etc/nginx/mime.types;
+  default_type              application/octet-stream;
+  log_format                main  '$remote_addr - $remote_user [$time_local] "$request" '
+                            '$status $body_bytes_sent "$http_referer" '
+                            '"$http_user_agent" "$http_x_forwarded_for"';
+  access_log                /var/log/nginx/access.log  main;
+  sendfile                  on;
+  keepalive_timeout         65;
+  proxy_read_timeout        300;
+  proxy_connect_timeout     300;
+  proxy_send_timeout        300;
+  server {
+    listen                  80;
+    listen                  443 ssl;
+    ssl_certificate         /etc/nginx/ssl/fullchain.crt;
+    ssl_certificate_key     /etc/nginx/ssl/server.key;
+    ssl_protocols           TLSv1 TLSv1.1 TLSv1.2;
+    ssl_ciphers             HIGH:!aNULL:!MD5;
+    client_max_body_size    10M;
+    server_name             _;
+    location / {
+        root                /app;
+        index               index.html;
+        try_files           $uri $uri/ /index.html;
+    }
+    location /api/ {
+        # add_header          'Access-Control-Allow-Origin' '*' always;
+        # add_header          'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+        # add_header          'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+        # add_header          'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+        # proxy_read_timeout  10;
+        # proxy_send_timeout  10;
+        send_timeout        60;
+        resolver_timeout    120;
+        client_body_timeout 120;
+        
+        # set headers to pass request info to Flask
+        proxy_set_header    Host $http_host;
+        proxy_set_header    X-Forwarded-Proto $scheme;
+        proxy_set_header    X-Forwarded-For $remote_addr;
+        proxy_redirect      off;
+        proxy_pass          http://api:5000$request_uri;
+    }
+    location /docs/ {
+        # add_header          'Access-Control-Allow-Origin' '*' always;
+        # add_header          'Access-Control-Allow-Methods' 'GET, POST, PUT, DELETE, OPTIONS';
+        # add_header          'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization';
+        # add_header          'Access-Control-Expose-Headers' 'Content-Length,Content-Range';
+        # proxy_read_timeout  10;
+        # proxy_send_timeout  10;
+        send_timeout        60;
+        resolver_timeout    120;
+        client_body_timeout 120;
+        
+        # set headers to pass request info to Flask
+        proxy_set_header    Host $http_host;
+        proxy_set_header    X-Forwarded-Proto $scheme;
+        proxy_set_header    X-Forwarded-For $remote_addr;
+        proxy_redirect      off;
+        proxy_pass          http://docs:8000/docs/;
+    }
+    error_page              500 502 503 504  /50x.html;
+    location = /50x.html {
+      root                  /usr/share/nginx/html;
+    }
+  }
+}
+EOF
+
+  ###
+  # UI: vue cli default preset
+  ###
+
+  cat > .vuerc << EOF
+  {
+    "useConfigFiles": false,
+    "plugins": {
+      "@vue/cli-plugin-babel": {},
+      "@vue/cli-plugin-typescript": {
+        "classComponent": true,
+        "useTsWithBabel": true
+      },
+      "@vue/cli-plugin-router": {
+        "historyMode": true
+      },
+      "@vue/cli-plugin-vuex": {},
+      "@vue/cli-plugin-eslint": {
+        "config": "prettier",
+        "lintOn": [
+          "save"
+        ]
+      },
+      "@vue/cli-plugin-unit-jest": {},
+      "@vue/cli-plugin-e2e-cypress": {}
+    },
+    "vueVersion": "3",
+    "cssPreprocessor": "dart-sass"
+  }
+EOF
+  vue create --preset .vuerc app || die
+  rm -f .vuerc
+  cd ${DIR}/ui/app
+  yarn global upgrade --latest || die
+  yarn add bootstrap || die
+  yarn add @popperjs/core || die
+fi
+
+cd ${DIR}
+
+######
+# GIT: ignore
+######
+
+if [ ! -f .gitignore ]; then
+  cat > .gitignore << EOF
+# Development Environment
+.vscode
+
+# Environment configuration
+.env*
+Pipfile*
+
+# Folders
+build
+dist
+node_modules
+*.egg-info
+
+# Generated files
+CHANGELOG.md
+EOF
+fi
+
+######
+# Docker: ignore
+######
+
+if [ ! -f .dockerignore ]; then
+  cat > .dockerignore << EOF
+.env*
+node_modules
+EOF
+fi
+
+######
+# Docker: compose
+######
+
+if [ ! -f docker-compose.yml ]; then
+  cat > docker-compose.yml << EOF
+version: '3'
+
+services:
+  ui:
+    build:
+      context: ui
+      args:
+        GIT_VERSION: "\${GIT_VERSION}"
+        GIT_BRANCH: "\${GIT_BRANCH}"
+        GIT_LASTCOMMITDATE: "\${GIT_LASTCOMMITDATE}"
+    image: ui
+    hostname: ui
+    depends_on:
+      - api
+    restart: unless-stopped
+    env_file: .env
+  api:
+    build:
+      context: api
+    hostname: api
+    restart: unless-stopped
+    volumes:
+      - ./api/app:/app
+      - ./api/static:/vol/web/static
+      - ./api/media:/vol/web/media
+    command: >
+      sh -c "./docs/scripts/generate_changelog.sh &&
+             (cd docs; mkdocs build --clean) &&
+             python manage.py collectstatic --noinput &&
+             python manage.py wait_for_db &&
+             python manage.py migrate &&
+             python manage.py initadmin &&
+             python manage.py runserver 0.0.0.0:5000"
+    environment:
+      - POSTGRES_HOST=db
+    env_file: .env
+    depends_on:
+      - db
+  db:
+    image: postgres:13.4-alpine
+    hostname: db
+    restart: unless-stopped
+    env_file: .env
+EOF
+fi
+
+######
+# Docker: compose override
+######
+if [ ! -f docker-compose.override.yml ]; then
+  cat > docker-compose.override.yml << EOF
+version: '3'
+
+services:
+  ui:
+    build:
+      dockerfile: Dockerfile.development
+    volumes:
+      - ./ui/app:/app
+    ports:
+      - '80${APP_ID}:8080'
+  api:
+    ports:
+      - '50${APP_ID}:5000'
+  db:
+    ports:
+        - '543${APP_ID}:5432'
+EOF
+fi
+
+######
+# ENVIRONMENT
+######
+
+if [ ! -f .envrc ]; then
+  cat > .envrc << EOF
+export PYTHONPATH=.:\$(pipenv --py)
+export PIPENV_SKIP_LOCK=true
+export PIPENV_VERBOSITY=-1
+EOF
+fi
+
+if [ ! -f .env ]; then
+  cat > .env << EOF
+POSTGRES_HOST=db
+POSTGRES_PORT=5432
+POSTGRES_DB=${PROJECT_NAME}
+POSTGRES_USER=postgres
+POSTGRES_PASSWORD=$(echo $RANDOM | md5sum | head -c 20)
+
+DJANGO_SU_NAME=admin
+DJANGO_SU_EMAIL=
+DJANGO_SU_PASSWORD=$(echo $RANDOM | md5sum | head -c 20)
+
+VUE_FRONTEND_PORT=80${APP_ID}
+DJANGO_BACKEND_PORT=50${APP_ID}
+
+DJANGO_ALLOWED_HOSTS=*
+DJANGO_CSRF_TRUSTED_ORIGINS=localhost:\${DJANGO_BACKEND_PORT},localhost:\${VUE_FRONTEND_PORT},api:5000
+DJANGO_CORS_ORIGIN_WHITELIST=localhost:\${DJANGO_BACKEND_PORT},localhost:\${VUE_FRONTEND_PORT},api:5000
+
+VUE_APP_TITLE='${PROJECT_NAME}'
+VITE_APP_BACKEND='http://localhost:\${DJANGO_BACKEND_PORT}'
+VITE_APP_DOCUMENTATION_URL='http://localhost:\${VUE_FRONTEND_PORT}'
+EOF
+fi
+
+######
+# GIT: initialization
+######
+
+if [ ! -d .git ]; then
+  git init
+fi

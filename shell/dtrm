@@ -1,0 +1,29 @@
+#!/bin/bash
+
+function usage {
+    echo "USAGE: $(basename $0) container-name [-a]"
+    echo "  -a: remove all including images"
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+RMI=0
+if [ "$2" == "-a" ]; then
+    RMI=1
+fi
+
+PAT="$1"
+
+while read container
+do
+    docker rm -f $container
+done < <(docker ps -a --format "{{.Names}}" | grep "$PAT")
+
+if [ $RMI -eq 1 ]; then
+    while read image
+    do
+        docker image rm -f $image
+    done < <(docker images --format "{{.Repository}}" | grep "$PAT")
+fi

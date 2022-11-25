@@ -1,13 +1,10 @@
 from setuptools import setup, find_packages
 
-with open('requirements.txt') as f:
-    requirements = f.readlines()
-
 long_description = 'Power User Tools make your life so much easier.'
 
 setup(
     name='power-user-tools',
-    version='0.0.1',
+    version='0.0.2',
     author='dameyerdave',
     author_email='dameyerdave@gmail.com',
     url='https://github.com/dameyerdave/power-user-tools',
@@ -40,7 +37,7 @@ setup(
         'shell/xpgl',
         'shell/xppr',
         'shell/xprandpw',
-        'shell/xprmhistory',
+        'shell/xpgrmhistory',
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -48,6 +45,13 @@ setup(
         "Operating System :: OS Independent",
     ],
     keywords='power user tools ssh sshd reverse tunnel docker easy development',
-    install_requires=requirements,
+    install_requires=[
+        'click==8.1.3',
+        'python-dotenv==0.21.0',
+        'friendlylog==1.0.2',
+        'yachalk==0.1.5',
+        'rich==12.6.0',
+        'sh==1.14.3',
+    ],
     zip_safe=False
 )

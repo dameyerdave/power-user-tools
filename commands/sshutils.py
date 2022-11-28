@@ -1,5 +1,11 @@
+"""
+SSH utils
+====================================
+Tools to manage SSH.
+"""
+
 import click
-from commands.helpers import Interactive
+from sh import ssh
 
 
 @click.command()
@@ -10,6 +16,7 @@ from commands.helpers import Interactive
 @click.option('--verbose', '-v', is_flag=True, default=False, help='display verbose output')
 @click.argument('connection')
 def sussh(connection, port=22, identity=None, force_password_auth=False, disable_host_key_checking=False, verbose=False):
+    """Extended ssh command"""
     _options = ''
     if force_password_auth:
         _options += ' -o PreferredAuthentications=password -o PubkeyAuthentication=no'
@@ -24,8 +31,7 @@ def sussh(connection, port=22, identity=None, force_password_auth=False, disable
 
     if verbose:
         print('RUNNING:', command)
-    ssh = Interactive(command)
-    ssh.run()
+    ssh(command.split())
 
 
 @click.command()
@@ -33,9 +39,7 @@ def sussh(connection, port=22, identity=None, force_password_auth=False, disable
 @click.argument('rport')
 @click.argument('lport')
 def surtun(connection, rport, lport):
-    cmd = Interactive(
-        f"ssh -4 -N -T -R {rport}:localhost:{lport} {connection}")
-    cmd.run()
+    ssh('-4', '-N', '-T', '-R', f"{rport}:localhost:{lport}", connection)
 
 
 @click.command()
@@ -43,6 +47,4 @@ def surtun(connection, rport, lport):
 @click.argument('rport')
 @click.argument('lport')
 def suftun(connection, rport, lport):
-    cmd = Interactive(
-        f"ssh -4 -N -T -L {lport}:localhost:{rport} {connection}")
-    cmd.run()
+    ssh('-4', '-N', '-T', '-L', f"{lport}:localhost:{rport}", connection)

@@ -1,3 +1,9 @@
+"""
+Dockertools
+====================================
+Tools to manage Docker.
+"""
+
 import os
 import sys
 import click

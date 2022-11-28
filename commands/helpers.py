@@ -1,3 +1,9 @@
+"""
+Helpers
+====================================
+Helper classes and functions
+"""
+
 import os
 import shlex
 from subprocess import Popen, run

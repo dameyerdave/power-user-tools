@@ -10,8 +10,10 @@ There are different areas of tools:
 ## Getting started
 
 ```bash
-pip install power-user-tools
+pip3 install power-user-tools
 ```
+
+The Power User Tools will be installed to you computer to `/usr/local/bin`.
 
 ## Contributing
 

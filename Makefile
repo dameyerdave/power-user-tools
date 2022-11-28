@@ -6,3 +6,5 @@ build: clean
 	@python setup.py sdist bdist_wheel
 deploy: build
 	@twine upload dist/*
+doc:
+	cd docs && $(MAKE) html

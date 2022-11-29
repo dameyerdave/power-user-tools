@@ -47,9 +47,11 @@ def dcc(docker_arguments, shell=False, ignore_override=False):
         'GIT_COMMITHASH': 'N/A'
     }
     if isfile('.env'):
-        load_dotenv()
-        dcc_env = os.getenv('DCC_ENV')
+        load_dotenv('.env')
+        dcc_env = os.environ.get('DCC_ENV')
         M.debug(f"Running DCC environment {dcc_env}.")
+    else:
+        M.warn(f"No .env file found in current directory: {os.getcwd()}")
     if isdir('.git'):
         if E.success('git rev-parse --is-inside-work-tree'):
             env['GIT_VERSION'] = E.run('git describe --always')
@@ -57,6 +59,8 @@ def dcc(docker_arguments, shell=False, ignore_override=False):
             env['GIT_LASTCOMMITDATE'] = E.run('git log -1 --format=%cI')
             env['GIT_COMMITHASH'] = E.run('git rev-parse HEAD')
         M.debug('Git repository detected.')
+    else:
+        M.warn("Not a git repository.")
 
     docker_files = [
         'docker-compose.yml'

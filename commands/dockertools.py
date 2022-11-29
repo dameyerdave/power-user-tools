@@ -18,9 +18,10 @@ docker = sh.Command('docker')
 
 
 @click.command(context_settings={"ignore_unknown_options": True})
+@click.option('--shell', '-s', is_flag=True, default=False, help='open a shell to the container')
 @click.option('--ignore-override', '-i', is_flag=True, default=False, help='ignores the docker-compose.override.yml')
 @click.argument('docker_arguments', nargs=-1)
-def dcc(docker_arguments, ignore_override=False):
+def dcc(docker_arguments, shell=False, ignore_override=False):
     """
     DCC is a wrapper around docker-compose. If you are executing it inside a git
     repository it will set the following environment variables:
@@ -48,12 +49,14 @@ def dcc(docker_arguments, ignore_override=False):
     if isfile('.env'):
         load_dotenv()
         dcc_env = os.getenv('DCC_ENV')
+        M.debug(f"Running DCC environment {dcc_env}.")
     if isdir('.git'):
         if E.success('git rev-parse --is-inside-work-tree'):
             env['GIT_VERSION'] = E.run('git describe --always')
             env['GIT_BRANCH'] = E.run('git rev-parse --abbrev-ref HEAD')
             env['GIT_LASTCOMMITDATE'] = E.run('git log -1 --format=%cI')
             env['GIT_COMMITHASH'] = E.run('git rev-parse HEAD')
+        M.debug('Git repository detected.')
 
     docker_files = [
         'docker-compose.yml'
@@ -62,10 +65,15 @@ def dcc(docker_arguments, ignore_override=False):
         docker_files.append(f"docker-compose.{dcc_env}.yml")
     if not ignore_override and isfile('docker-compose.override.yml'):
         docker_files.append('docker-compose.override.yml')
+    if shell:
+        docker_arguments = ['exec', *docker_arguments, '/bin/bash']
     command = f"docker-compose -f {' -f '.join(docker_files)} {' '.join(docker_arguments)}"
     M.debug(f"Command: {command}")
     os.environ.update(env)
-    bash('-c', command, _fg=True)
+    try:
+        bash('-c', command, _fg=True)
+    except Exception as ex:
+        M.error(f"Error executing command {command}: {ex}")
 
 
 @click.command()

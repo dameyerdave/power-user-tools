@@ -18,10 +18,11 @@ docker = sh.Command('docker')
 
 
 @click.command(context_settings={"ignore_unknown_options": True})
-@click.option('--shell', '-s', is_flag=True, default=False, help='open a shell to the container')
+@click.option('--shell', '-s', is_flag=True, default=False, help='open a shell to the container, basically exec')
+@click.option('--logs', '-l', is_flag=True, default=False, help='follows the logs, basically logs -f')
 @click.option('--ignore-override', '-i', is_flag=True, default=False, help='ignores the docker-compose.override.yml')
 @click.argument('docker_arguments', nargs=-1)
-def dcc(docker_arguments, shell=False, ignore_override=False):
+def dcc(docker_arguments, shell=False, logs=False, ignore_override=False):
     """
     DCC is a wrapper around docker-compose. If you are executing it inside a git
     repository it will set the following environment variables:
@@ -71,6 +72,8 @@ def dcc(docker_arguments, shell=False, ignore_override=False):
         docker_files.append('docker-compose.override.yml')
     if shell:
         docker_arguments = ['exec', *docker_arguments, '/bin/bash']
+    elif logs:
+        docker_arguments = ['logs', '-f', *docker_arguments]
     command = f"docker-compose -f {' -f '.join(docker_files)} {' '.join(docker_arguments)}"
     M.debug(f"Command: {command}")
     os.environ.update(env)

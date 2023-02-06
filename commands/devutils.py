@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 git = sh.Command('git')
 
 def __render_message(msg):
-  match = re.match(r'(?P<type>^\[.+\])? ?(?P<msg>.*)', msg)
+  match = re.match(r'(?P<type>(^\[.+\]|^[a-z]+(\(.+\))?:))? ?(?P<msg>.*)', msg)
   if match and match.group('type'):
     return f"[b][blue]{match.group('type')}[/blue] {match.group('msg')}[/b]"
   return f"[b]{msg}[/b]"

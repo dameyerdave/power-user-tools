@@ -77,10 +77,10 @@ class TableOutput():
     console = Console()
 
     @classmethod
-    def out(cls, data: str | list, sep: str = '#', headers: tuple[str] = None):
+    def out(cls, data: str | list, sep: str = '#', headers: tuple[str] = None, show_lines = False):
         table = Table(
             show_header=(headers is not None),
-            show_lines=False,
+            show_lines=show_lines,
             show_edge=False
         )
         if headers:
@@ -91,7 +91,10 @@ class TableOutput():
             data = data.split('\n')
 
         for line in data:
-            table.add_row(*line.split(sep))
+            if isinstance(line, str):
+                table.add_row(*line.split(sep))
+            elif isinstance(line, list):
+                table.add_row(*line)
 
         cls.console.print(table)
 

@@ -4,7 +4,7 @@ long_description = 'Power User Tools make your life so much easier.'
 
 setup(
     name='power-user-tools',
-    version='0.0.9',
+    version='0.1.1',
     author='dameyerdave',
     author_email='dameyerdave@gmail.com',
     url='https://github.com/dameyerdave/power-user-tools',

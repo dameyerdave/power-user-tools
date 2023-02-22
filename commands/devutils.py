@@ -29,8 +29,8 @@ def xpgl(arguments):
   """
   rows = []
   cnt = 1
-  for line in git('--no-pager', 'log', '-n', '10', *arguments, '--pretty=%h#%d#%s#%cn#%cr'):
-    cols = line.rstrip('\n').split('#')
+  for line in git('--no-pager', 'log', '-n', '10', *arguments, '--pretty=%h~%d~%s~%cn~%cr'):
+    cols = line.rstrip('\n').split('~')
     cols[1], cols[2], cols[3], cols[4] = cols[3], cols[4], __render_message(cols[2]), cols[1]
     cols.insert(0, str(cnt))
     rows.append(cols)

@@ -11,6 +11,7 @@ import sh
 from commands.helpers import Executor as E, Message as M, TableOutput as T
 from os.path import isfile, isdir
 from dotenv import load_dotenv
+import traceback
 
 # declare the commands globally
 bash = sh.Command('bash')
@@ -45,7 +46,10 @@ def dcc(docker_arguments, shell=False, logs=False, ignore_override=False):
         'GIT_VERSION': '?.?.?',
         'GIT_BRANCH': 'N/A',
         'GIT_LASTCOMMITDATE': 'N/A',
-        'GIT_COMMITHASH': 'N/A'
+        'GIT_COMMITHASH': 'N/A',
+        'UID': 0,
+        'GID': 0,
+        'UNAME': 'root'
     }
     if isfile('.env'):
         load_dotenv('.env')
@@ -62,6 +66,10 @@ def dcc(docker_arguments, shell=False, logs=False, ignore_override=False):
         M.debug('Git repository detected.')
     else:
         M.warn("Not a git repository.")
+
+    env['UID'] = E.run('id -u')
+    env['GID'] = E.run('id -g')
+    env['UNAME'] = E.run('whoami')
 
     docker_files = [
         'docker-compose.yml'
@@ -81,6 +89,7 @@ def dcc(docker_arguments, shell=False, logs=False, ignore_override=False):
         bash('-c', command, _fg=True)
     except Exception as ex:
         M.error(f"Error executing command {command}: {ex}")
+        traceback.print_exc()
 
 
 @click.command()
@@ -169,3 +178,6 @@ def dtclean(force):
             docker(*args, _fg=True)
     except:
         pass
+
+if __name__ == '__main__':
+    globals()[sys.argv[1]]()

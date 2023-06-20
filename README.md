@@ -15,6 +15,15 @@ pip3 install power-user-tools
 
 The Power User Tools will be installed to you computer to `/usr/local/bin`.
 
+## Install dependencies
+
+To properly work with the power user tools you need to install sone additional software:
+
+```bash
+brew install git
+brew install sshfs
+```
+
 ## Contributing
 
 Contributions are welcome.

@@ -6,7 +6,7 @@ Helper classes and functions
 
 import os
 import shlex
-from subprocess import Popen, run
+from subprocess import run
 from enum import Enum
 from yachalk import chalk
 from rich.console import Console
@@ -17,10 +17,11 @@ class ReturnCode(Enum):
     OK = 0
 
 
-class Executor():
+class Executor:
     """
     Class to execute shell commands
     """
+
     @classmethod
     def success(cls, command: str, env: dict = None) -> bool:
         ret, _ = cls.__run(command, env=env)
@@ -46,13 +47,14 @@ class Executor():
     @classmethod
     def __handle_output(cls, output: str) -> str:
         # We remove the last \n
-        return output.rstrip('\n')
+        return output.rstrip("\n")
 
 
-class Message():
+class Message:
     """
     Class to output colored messages to the console
     """
+
     @classmethod
     def info(cls, message):
         print(chalk.green_bright.bold(message))
@@ -70,25 +72,30 @@ class Message():
         print(chalk.blue_bright.bold(message))
 
 
-class TableOutput():
+class TableOutput:
     """
     Class to output text in table format
     """
+
     console = Console()
 
     @classmethod
-    def out(cls, data: str | list, sep: str = '#', headers: tuple[str] = None, show_lines = False):
+    def out(
+        cls,
+        data: str | list,
+        sep: str = "#",
+        headers: tuple[str] = None,
+        show_lines=False,
+    ):
         table = Table(
-            show_header=(headers is not None),
-            show_lines=show_lines,
-            show_edge=False
+            show_header=(headers is not None), show_lines=show_lines, show_edge=False
         )
         if headers:
             for header in headers:
                 table.add_column(header)
 
         if isinstance(data, str):
-            data = data.split('\n')
+            data = data.split("\n")
 
         for line in data:
             if isinstance(line, str):

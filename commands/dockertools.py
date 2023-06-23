@@ -8,6 +8,7 @@ import os
 import sys
 import click
 import sh
+import json
 from commands.helpers import Executor as E, Message as M, TableOutput as T
 from os.path import isfile, isdir
 from dotenv import load_dotenv
@@ -138,7 +139,7 @@ def dtins(filter: str = None):
     rows = []
     args = ["ps", "-a", "--format", "{{.Names}}"]
     if filter:
-        args.append("--filter ")
+        args.append("--filter")
         args.append(f"name={filter}")
     for container in docker(*args, _iter=True):
         container = container.rstrip("\n")
@@ -148,8 +149,26 @@ def dtins(filter: str = None):
             "{{ .State.Status }}#{{ .HostConfig.RestartPolicy.Name }}",
             container,
         )
-        rows.append(f"{container}#{insp}")
+        rows.append(f"{container}#{insp.rstrip()}")
     T.out(rows, headers=("Name", "Status", "Restart"))
+
+
+@click.command()
+@click.argument("filter", required=False)
+def dtvols(filter: str = None):
+    list_args = ["volume", "list", "--format", "{{ .Name }}"]
+    if filter:
+        list_args.append("--filter")
+        list_args.append(f"name={filter}")
+    vols = docker(*list_args).split("\n")[:-1]
+    rows = []
+    for vol in vols:
+        args = ["volume", "inspect"]
+        insp = json.loads(docker(*args, vol).stdout)[0]
+        rows.append(
+            f"{insp['Name']}#{insp['CreatedAt']}#{insp['Mountpoint']}#{insp['Labels']['com.docker.compose.project'] if 'Labels' in insp and insp['Labels'] and 'com.docker.compose.project' in insp['Labels'] else 'Unknown'}"
+        )
+    T.out(rows, headers=("Name", "CreatedAt", "Mountpoint", "Project"))
 
 
 def __get_container_name(pattern):

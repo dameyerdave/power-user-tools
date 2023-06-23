@@ -4,7 +4,7 @@ long_description = "Power User Tools make your life so much easier."
 
 setup(
     name="power-user-tools",
-    version="0.1.3",
+    version="0.1.4",
     author="dameyerdave",
     author_email="dameyerdave@gmail.com",
     url="https://github.com/dameyerdave/power-user-tools",
@@ -24,6 +24,7 @@ setup(
             "dtsh = commands.dockertools:dtsh",
             "dtclean = commands.dockertools:dtclean",
             "dtins = commands.dockertools:dtins",
+            "dtvols = commands.dockertools:dtvols",
             "xpgl = commands.devutils:xpgl",
         ]
     },

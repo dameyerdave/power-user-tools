@@ -171,6 +171,18 @@ def dtvols(filter: str = None):
     T.out(rows, headers=("Name", "CreatedAt", "Mountpoint", "Project"))
 
 
+@click.command()
+@click.argument("pattern")
+def dtmounts(pattern):
+    container = __get_container_name(pattern)
+    list_args = ["inspect", "--format", "{{ json .Mounts }}", container]
+    vols = json.loads(docker(*list_args).stdout)  # .split("\n")[:-1]
+    rows = []
+    for vol in vols:
+        rows.append(f"{vol['Type']}#{vol['Source']}#{vol['Destination']}")
+    T.out(rows, headers=("Type", "Source", "Destination"))
+
+
 def __get_container_name(pattern):
     containers = E.run('docker ps -a --format "{{.Names}}"').split("\n")
     found_containers = []

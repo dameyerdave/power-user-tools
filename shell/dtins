@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function usage {
-    echo "USAGE dtrestart [pattern]"
+    echo "USAGE dtins [pattern]"
     exit 1
 }
 

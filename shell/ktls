@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+# kubectl get pods,services,deployments,jobs,daemonset
+kubectl get all -A

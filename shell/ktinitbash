@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+brew install bash
+brew install bash-completion@2
+
+echo 'PATH=/opt/homebrew/bin:$PATH' >>~/.bash_profile
+echo 'brew_etc="$(brew --prefix)/etc" && [[ -r "${brew_etc}/profile.d/bash_completion.sh" ]] && . "${brew_etc}/profile.d/bash_completion.sh"' >>~/.bash_profile
+echo 'source <(kubectl completion bash)' >>~/.bash_profile
+kubectl completion bash >/opt/homebrew/etc/bash_completion.d/kubectl
+echo 'alias k=kubectl' >>~/.bash_profile
+echo 'complete -o default -F __start_kubectl k' >>~/.bash_profile

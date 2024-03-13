@@ -4,3 +4,4 @@ autopep8
 pur
 twine
 sphinx
+pelican

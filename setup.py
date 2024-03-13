@@ -4,7 +4,7 @@ long_description = "Power User Tools make your life so much easier."
 
 setup(
     name="power-user-tools",
-    version="0.1.5",
+    version="0.1.6",
     author="dameyerdave",
     author_email="dameyerdave@gmail.com",
     url="https://github.com/dameyerdave/power-user-tools",
@@ -17,6 +17,7 @@ setup(
         "console_scripts": [
             "sussh = commands.sshutils:sussh",
             "surtun = commands.sshutils:surtun",
+            "suftun = commands.sshutils:suftun",
             "sumount = commands.sshutils:sumount",
             "dcc = commands.dockertools:dcc",
             "dtls = commands.dockertools:dtls",
@@ -41,6 +42,12 @@ setup(
         "shell/xppr",
         "shell/xprandpw",
         "shell/xpgrmhistory",
+        "shell/ktls",
+        "shell/ktclean",
+        "shell/ktdeploy",
+        "shell/ktinitbash",
+        "shell/ktpods",
+        "shell/ktns",
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
@@ -54,7 +61,7 @@ setup(
         "friendlylog==1.0.2",
         "yachalk==0.1.5",
         "rich==12.6.0",
-        "sh==1.14.3",
+        "sh==2.0.6",
     ],
     zip_safe=False,
 )

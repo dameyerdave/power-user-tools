@@ -1,5 +1,6 @@
 dist
 build
+bundle
 _build
 *.egg-info
 Pipfile
@@ -7,3 +8,4 @@ Pipfile
 .env*
 .vscode
 *.pyc
+*.tar.gz

@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+
+kubectl delete deployments --all -A
+kubectl delete services --all -A
+kubectl delete pods --all -A
+kubectl delete daemonset --all -A
+
+sudo kubeadm reset

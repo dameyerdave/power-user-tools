@@ -3,4 +3,4 @@ python-dotenv==0.21.0
 friendlylog==1.0.2
 yachalk==0.1.5
 rich==12.6.0
-sh==1.14.3
+sh==2.0.6

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+function usage {
+    echo "To sets the current namespace use:"
+    echo "==========================="
+    echo "  $(basename $0) name-space"
+    echo "==========================="
+    echo ""
+    echo "Available namespaces:"
+    kubectl get namespace | sed '1 d'
+    exit 1
+}
+
+if [ $# -lt 1 ]; then
+    echo "Current namespace: "
+    echo "==========================="
+    echo "  $(kubectl config view | grep namespace | sed -e 's/ //g' | cut -d':' -f2)"
+    echo "==========================="
+    echo ""
+    usage
+fi
+
+kubectl config set-context --current --namespace=$1

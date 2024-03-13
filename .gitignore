@@ -1,6 +1,6 @@
 dist
 build
-bundle
+put
 _build
 *.egg-info
 Pipfile

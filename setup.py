@@ -1,10 +1,13 @@
 from setuptools import setup, find_packages
+import sys
 
 long_description = "Power User Tools make your life so much easier."
 
+sys.executable = '/usr/bin/env python3'
+
 setup(
     name="power-user-tools",
-    version="0.1.6",
+    version="0.1.8",
     author="dameyerdave",
     author_email="dameyerdave@gmail.com",
     url="https://github.com/dameyerdave/power-user-tools",
@@ -49,6 +52,11 @@ setup(
         "shell/ktpods",
         "shell/ktns",
     ],
+    options={
+        'build_scripts': {
+            'executable': '/usr/bin/env python3',
+        },
+    },
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
